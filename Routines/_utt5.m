@@ -47,10 +47,14 @@ BADERROR ;
  ; ZEXCEPT: %utt6cnt,%utt6var - if present, NEWED following top entry of routine %utt6
  N X
  I $D(%utt6var) S %ut("ENT")="BADERROR" S %utt6cnt=$G(%utt6cnt)+1,^TMP("%utt5",$J,%utt6cnt,"BADERROR")=""
- ; following syntax error is on purpose to throw an error
- S X= ; syntax error on purpose
+ D BADERRORINNER
  Q
  ;
+BADERRORINNER ; Use a label called from the test case because that is the typical pattern in real code
+ N ; New variables to test error trap in routine which hides the %ut variable
+ ; The following syntax error is on purpose to throw an error
+ S X= ; syntax error on purpose
+ Q
 CALLFAIL ;
  ; ZEXCEPT: %ut - Newed in EN^%zu
  ; ZEXCEPT: %utt6cnt,%utt6var - if present, NEWED following top entry of routine %utt6

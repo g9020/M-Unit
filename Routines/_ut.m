@@ -1,5 +1,5 @@
 %ut ;VEN-SMH/JLI - PRIMARY PROGRAM FOR M-UNIT TESTING ;2019-08-29  4:29 PM
- ;;1.62;M-UNIT;;Feb 10 2020
+ ;;1.63;M-UNIT;;Feb 10 2020
  ; Submitted to OSEHRA Jul 8, 2017 by Joel L. Ivey under the Apache 2 license (http://www.apache.org/licenses/LICENSE-2.0.html)
  ; Original routine authored by Joel L. Ivey as XTMUNIT while working for U.S. Department of Veterans Affairs 2003-2012
  ; Includes addition of %utVERB and %utBREAK arguments and code related to them as well as other substantial additions authored by Sam Habiel 07/2013-04/2014
@@ -109,7 +109,7 @@ EN1(%utROU,%utLIST) ;
  . ; == THIS FOR/DO BLOCK IS THE CENTRAL TEST RUNNER ==
  . S %utI=0
  . F  S %utI=$O(%utETRY(%utI)) Q:%utI'>0  S %ut("ENUM")=%ut("ERRN")+%ut("FAIL") D
- . . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . . ;
  . . ; Run Set-up Code (only if present)
  . . S %ut("ENT")=$G(%ut("SETUP")) ; Current entry
@@ -277,6 +277,11 @@ ERROR ; record errors
  ; ZEXCEPT: %utERRL,%utGUI,%utERR -CREATED IN SETUP, KILLED IN END
  ; ZEXCEPT: %ut  -- NEWED ON ENTRY
  ; ZEXCEPT: XTGUISEP - newed in GUINEXT
+ ;
+ ; Unwinding stack makes sure that error handling occurs in a place where the %ut variable is defined.
+ ; Don't unwind the last frames so that the test framework can handle the error.
+ Q:$ESTACK>2
+ ;
  S %ut("CHK")=%ut("CHK")+1
  I '$D(%utGUI) D ERROR1
  I $D(%utGUI) D
@@ -294,7 +299,7 @@ ERROR1 ;
  I $G(%ut("BREAK")) S @($S($$GETSYS()=47:"$ZS",1:"$ZE")_"="_""""""),$EC="" ; output for break added JLI 161020
  I $G(%ut("BREAK")) BREAK  ; if we are asked to break upon error, please do so!
  D SETIO^%ut1
- W !,%ut("ENT")," - " W:%ut("NAME")'="" %ut("NAME")," - Error: " W $S($$GETSYS()=47:$ZS,1:$ZE),! D
+ W !,%ut("ENT")," - " W:%ut("NAME")'="" %ut("NAME")," - Error: " W $S($$GETSYS()=47:$ZS,1:$ZE),! D WTRACE D
  . S %ut("ERRN")=%ut("ERRN")+1,%utERRL(%ut("ERRN"))=%ut("NAME"),%utERRL(%ut("FAIL"),"MSG")=$S($$GETSYS()=47:$ZS,1:$ZE),%utERRL(%ut("FAIL"),"ENTRY")=%ut("ENT")
  . Q
  D RESETIO^%ut1
@@ -449,29 +454,29 @@ GUINEXT(%utRSLT,%utLOC,XTGUISEP) ; Entry point for GUI execute next test - calle
  D  I %utROUT="" S @%utRSLT@(1)="" Q  ; 141018 JLI - Have to leave XTVALUE intact, in case they simply run again for STARTUP, etc.
  . I XTOLROU="",$D(@XTVALUE@("STARTUP")) D
  . . S %ut("LOC")=@XTVALUE@("STARTUP")
- . . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . . D @(@XTVALUE@("STARTUP"))
  . . Q
  . S @XTVALUE@("LASTROU")=%utROUT I %utROUT'="",$T(@("SETUP^"_%utROUT))'="" D
  . . S %ut("LOC")="SETUP^"_%utROUT
- . . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . . D @("SETUP^"_%utROUT)
  . . Q
  . I %utROUT="",$D(@XTVALUE@("SHUTDOWN")) D
  . . S %ut("LOC")=@XTVALUE@("SHUTDOWN")
- . . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . . D @(@XTVALUE@("SHUTDOWN"))
  . . Q
  . Q
  S %ut("LOC")=%utLOC
  S %ut("CHK")=0,%ut("CNT")=1,%utERR=0
  D  ; to limit range of error trap so we continue through other tests
- . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . D @%ut("LOC")
  . Q
  I $T(@("TEARDOWN^"_%utROUT))'="" D
  . S %ut("LOC")="TEARDOWN^"_%utROUT
- . N $ETRAP S $ETRAP="D ERROR^%ut"
+ . N $ETRAP,$ESTACK S $ETRAP="D ERROR^%ut"
  . D @("TEARDOWN^"_%utROUT)
  . Q
  S @%ut("RSLT")@(1)=%ut("CHK")_XTGUISEP_(%ut("CNT")-1-%utERR)_XTGUISEP_%utERR
@@ -494,3 +499,10 @@ ZHDIF(%ZH0,%ZH1) ;Display dif of two $ZH's
  ;
  N %ZH2 S %ZH2=T1-T0*1000
  QUIT %ZH2
+ ;
+WTRACE ; Write a stack trace.
+ Q:'%utVERB ; Disable if not verbose
+ N ENTRYNR
+ F ENTRYNR=$STACK(-1):-1:0 D
+ .W ENTRYNR,": ",$STACK(ENTRYNR,"place"),"  --  "_$STACK(ENTRYNR,"mcode"),!
+ Q
